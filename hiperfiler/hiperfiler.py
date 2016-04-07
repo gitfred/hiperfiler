@@ -18,19 +18,43 @@ import os
 
 import flask
 
+
 app = flask.Flask(__name__)
 
+BASE_DIR = os.getenv('HIPERFILER_BASE_DIR') or os.path.expanduser('~')
 
-@app.route("/files")
+
+@app.route("/files", methods=['GET'])
 def get_files_list():
-    files = os.listdir(os.path.expanduser('~'))
+    files = []
+    for elem in os.listdir(os.path.expanduser('~')):
+        if os.path.isfile(os.path.join(BASE_DIR, elem)):
+            files.append(elem)
+
     return flask.jsonify({"files": files})
 
 
-@app.route("/files/<name>")
+@app.route("/files/upload", methods=['POST'])
+def upload_files():
+    """TO UPLOAD WITH CURL
+
+    curl -F file=@/absolute/path/to/file.txt http://localhost:5000/files/upload
+    """
+    for file_ in flask.request.files.values():
+        filename = file_.filename
+        file_.save(os.path.join(BASE_DIR, filename))
+
+    return "DONE"
+
+
+@app.route("/files/<name>", methods=['GET'])
+def download_file(name):
+    return flask.send_from_directory(BASE_DIR, name)
+
+
+@app.route("/files/<name>/metadata", methods=['GET'])
 def get_file_metadata(name):
-    files = os.path.expanduser('~')
-    path = os.path.join(files, name)
+    path = os.path.join(BASE_DIR, name)
     data = {
         "path": path,
         "size": os.path.getsize(path),
@@ -39,6 +63,7 @@ def get_file_metadata(name):
     }
 
     return flask.jsonify(data)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
